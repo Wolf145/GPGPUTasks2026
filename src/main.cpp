@@ -4,10 +4,10 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
-#include <vector>
+#include <string_view>
 #include <type_traits>
 #include <utility>
-#include <string_view>
+#include <vector>
 
 template<typename T>
 std::string to_string(T value)
@@ -31,7 +31,8 @@ void reportError(cl_int err, const std::string &filename, int line)
 
 #define OCL_SAFE_CALL(expr) reportError(expr, __FILE__, __LINE__)
 
-static std::string getPlatformInfo(cl_platform_id platform, cl_platform_info clPlatformInfo) {
+static std::string getPlatformInfo(cl_platform_id platform, cl_platform_info clPlatformInfo)
+{
 	size_t platformInfoSize = 0;
 	OCL_SAFE_CALL(clGetPlatformInfo(platform, clPlatformInfo, 0, nullptr, &platformInfoSize));
 	std::string platformInfo(platformInfoSize, 0);
@@ -39,18 +40,22 @@ static std::string getPlatformInfo(cl_platform_id platform, cl_platform_info clP
 	return platformInfo;
 }
 
-template <typename T, typename = void>
-struct has_value_type : std::false_type {};
+template<typename T, typename = void>
+struct has_value_type : std::false_type
+{};
 
-template <typename T>
+template<typename T>
 struct has_value_type<T, std::void_t<typename T::value_type>>
-    : std::true_type {};
+    : std::true_type
+{};
 
-template <typename T>
-static T getDeviceInfo(cl_device_id device, cl_device_info clDeviceInfo) {
+template<typename T>
+static T getDeviceInfo(cl_device_id device, cl_device_info clDeviceInfo)
+{
 	size_t deviceInfoSize = sizeof(T);
 	T deviceInfo;
-	if constexpr (has_value_type<T>::value) {
+	if constexpr(has_value_type<T>::value)
+	{
 		OCL_SAFE_CALL(clGetDeviceInfo(device, clDeviceInfo, 0, nullptr, &deviceInfoSize));
 		deviceInfo = T(deviceInfoSize, 0);
 		OCL_SAFE_CALL(clGetDeviceInfo(device, clDeviceInfo, deviceInfoSize, deviceInfo.data(), nullptr));
@@ -62,51 +67,59 @@ ret:
 }
 
 static constexpr std::pair<cl_device_type, std::string_view> device_types[] = {
-	{CL_DEVICE_TYPE_CPU, "cpu"},
-	{CL_DEVICE_TYPE_GPU, "gpu"},
-	{CL_DEVICE_TYPE_ACCELERATOR, "accelerator"},
-	{CL_DEVICE_TYPE_DEFAULT, "default"},
-	{CL_DEVICE_TYPE_CUSTOM, "custom"}
+	{ CL_DEVICE_TYPE_CPU, "cpu" },
+	{ CL_DEVICE_TYPE_GPU, "gpu" },
+	{ CL_DEVICE_TYPE_ACCELERATOR, "accelerator" },
+	{ CL_DEVICE_TYPE_DEFAULT, "default" },
+	{ CL_DEVICE_TYPE_CUSTOM, "custom" }
 };
 
 static constexpr std::pair<cl_device_info, std::string_view> single_fp_configs[] = {
-	{CL_FP_DENORM, "denorm"},
-	{CL_FP_INF_NAN, "{INF, NAN}"},
-	{CL_FP_ROUND_TO_NEAREST, "round_to_nearest"},
-	{CL_FP_ROUND_TO_ZERO, "round_to_zero"},
-	{CL_FP_ROUND_TO_INF, "round_to_inf"},
-	{CL_FP_FMA, "fma"},
-	{CL_FP_CORRECTLY_ROUNDED_DIVIDE_SQRT, "correct_rounding_divide_sqrt"},
-	{CL_FP_SOFT_FLOAT, "soft_float"},
+	{ CL_FP_DENORM, "denorm" },
+	{ CL_FP_INF_NAN, "{INF, NAN}" },
+	{ CL_FP_ROUND_TO_NEAREST, "round_to_nearest" },
+	{ CL_FP_ROUND_TO_ZERO, "round_to_zero" },
+	{ CL_FP_ROUND_TO_INF, "round_to_inf" },
+	{ CL_FP_FMA, "fma" },
+	{ CL_FP_CORRECTLY_ROUNDED_DIVIDE_SQRT, "correct_rounding_divide_sqrt" },
+	{ CL_FP_SOFT_FLOAT, "soft_float" },
 };
 
-
-template <typename T>
-static std::string write(cl_device_info info, T data) {
+template<typename T>
+static std::string write(cl_device_info info, T data)
+{
 	std::string res;
-	if (info == CL_DEVICE_TYPE) {
-		for (auto &[device_type, device_type_str] : device_types) {
-			if (data & device_type)
-				return std::string(device_type_str);
-		}
-		return "unknown";
-	}
-	if (info == CL_DEVICE_SINGLE_FP_CONFIG) {
-		res = "\n            supported:\n";
-		bool found = false;
-		for (auto &[device_info, device_info_str] : single_fp_configs) {
-			if (data & device_info) {
-				res += "                ";
-				res += device_info_str;
-				res += "\n";
-				found = true;
+	switch(info)
+	{
+	case CL_DEVICE_TYPE:
+		{
+			for(auto &[device_type, device_type_str] : device_types)
+			{
+				if(data & device_type)
+					return to_string(device_type_str);
 			}
+			return "unknown";
 		}
-		if (found)
-			res.erase(res.size() - 1);
-		else
-			res += "                none";
-		return res;
+	case CL_DEVICE_SINGLE_FP_CONFIG:
+		{
+			res = "\n            supported:\n";
+			bool found = false;
+			for(auto &[device_info, device_info_str] : single_fp_configs)
+			{
+				if(data & device_info)
+				{
+					res += "                ";
+					res += device_info_str;
+					res += "\n";
+					found = true;
+				}
+			}
+			if(found)
+				res.erase(res.size() - 1);
+			else
+				res += "                none";
+			return res;
+		}
 	}
 	return "(n/a)";
 }
@@ -181,8 +194,8 @@ int main()
 			std::string kernels = getDeviceInfo<std::string>(device, CL_DEVICE_BUILT_IN_KERNELS);
 			std::cout << "        Device name: " << getDeviceInfo<std::string>(device, CL_DEVICE_NAME) << std::endl;
 			std::cout << "        Device type: " << write<cl_device_type>(CL_DEVICE_TYPE, getDeviceInfo<cl_device_type>(device, CL_DEVICE_TYPE)) << std::endl;
-			std::cout << "        Device memo [Mb]: " << (getDeviceInfo<cl_ulong>(device, CL_DEVICE_GLOBAL_MEM_SIZE)>>20) << std::endl;
-			std::cout << "        Device max memory alloc size [Mb]: " << (getDeviceInfo<cl_ulong>(device, CL_DEVICE_MAX_MEM_ALLOC_SIZE)>>20) << std::endl;
+			std::cout << "        Device memo [Mb]: " << (getDeviceInfo<cl_ulong>(device, CL_DEVICE_GLOBAL_MEM_SIZE) >> 20) << std::endl;
+			std::cout << "        Device max memory alloc size [Mb]: " << (getDeviceInfo<cl_ulong>(device, CL_DEVICE_MAX_MEM_ALLOC_SIZE) >> 20) << std::endl;
 			std::cout << "        Device built in kernels: " << (kernels.empty() || (!kernels.empty() && kernels[0] == 0) ? "(n/a)" : kernels) << std::endl;
 			std::cout << "        Device floating point config: " << write<cl_device_fp_config>(CL_DEVICE_SINGLE_FP_CONFIG, getDeviceInfo<cl_device_fp_config>(device, CL_DEVICE_SINGLE_FP_CONFIG)) << std::endl;
 		}
